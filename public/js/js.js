@@ -1,47 +1,151 @@
-var container, stats;
-var scene = new THREE.Scene();
-scene.background = new THREE.Color(0xcce0ff);
-scene.fog = new THREE.Fog(0xcce0ff, 500, 10000);
+// global variables
+var renderer;
+var scene;
+var camera;
+var cube;
 
-var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-container = document.createElement('div');
-document.body.appendChild(container);
+var control;
+var orbit;
 
-var renderer = new THREE.WebGLRenderer({ antialias: true });
-container.appendChild(renderer.domElement);
+// used for drag and drop
+var plane;
+var selectedObject;
+var offset = new THREE.Vector3();
+var objects = [];
 
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+// based on http://mrdoob.github.io/three.js/examples/webgl_interactive_draggablecubes.html
+function init() {
 
-window.addEventListener("resize", function () {
-	var width = window.innerWidth;
-	var height = window.innerHeight;
-	renderer.setSize(width, height);
-	camera.aspect = width / height;
-	camera.updateProjectionMatrix();
-});
+	// create a scene, that will hold all our elements such as objects, cameras and lights.
+	scene = new THREE.Scene();
 
-//camera position
-camera.position.z = 5;
+	// create a camera, which defines where we're looking at.
+	camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-//stats
-stats = new Stats();
-container.appendChild(stats.dom);
+	// create a render, sets the background color and the size
+	renderer = new THREE.WebGLRenderer();
+	renderer.setClearColor(0x00000, 1.0);
+	renderer.setSize(window.innerWidth, window.innerHeight);
 
-//render to the page
-var render = function () {
-	renderer.render(scene, camera);
-};
+	plane = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000, 18, 18), new THREE.MeshBasicMaterial({
+		color: 0x00ff00,
+		opacity: 0.25,
+		transparent: true
+	}));
+	plane.visible = false;
+	scene.add(plane);
 
-var update = function () {
-	stats.update();
-};
+	for (var i = 0; i < 2; i++) {
+		// create a cube and add to scene
+		var cubeGeometry = new THREE.BoxGeometry(2, 2, 2);
+		var cubeMaterial = new THREE.MeshBasicMaterial({ wireframe: true });
+		cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+		objects.push(cube);
+		scene.add(cube);
+	}
 
-var animate = function () {
-	requestAnimationFrame(animate);
-	update();
+	// position and point the camera to the center of the scene
+	camera.position.x = 35;
+	camera.position.y = 35;
+	camera.position.z = 53;
+	camera.lookAt(scene.position);
+
+	// add some controls so we can rotate
+	orbit = new THREE.OrbitControls(camera, renderer.domElement);
+
+	// add the output of the renderer to the html element
+	document.body.appendChild(renderer.domElement);
+
+	// call the render function
 	render();
+}
+
+function addControls(controlObject) {
+	var gui = new dat.GUI();
+	gui.add(controlObject, 'rotationSpeed', -0.1, 0.1);
+	gui.add(controlObject, 'scale', 0.01, 2);
+}
+
+function render() {
+	renderer.render(scene, camera);
+	orbit.update();
+	requestAnimationFrame(render);
+}
+
+document.onmousemove = function (event) {
+	// make sure we don't access anything else
+	event.preventDefault();
+
+	// get the mouse positions
+	var mouse_x = (event.clientX / window.innerWidth) * 2 - 1;
+	var mouse_y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+	// get the 3D position and create a raycaster
+	var vector = new THREE.Vector3(mouse_x, mouse_y, 0.5);
+	vector.unproject(camera);
+	var raycaster = new THREE.Raycaster(camera.position,
+		vector.sub(camera.position).normalize());
+
+	// first check if we've already selected an object by clicking
+	if (selectedObject) {
+		// check the position where the plane is intersected
+		var intersects = raycaster.intersectObject(plane);
+		// reposition the selectedobject based on the intersection with the plane
+		selectedObject.position.copy(intersects[0].point.sub(offset));
+	} else {
+		// if we haven't selected an object, we check if we might need
+		// to reposition our plane. We need to do this here, since
+		// we need to have this position before the onmousedown
+		// to calculate the offset.
+		var intersects = raycaster.intersectObjects(objects);
+
+		if (intersects.length > 0) {
+			// now reposition the plane to the selected objects position
+			plane.position.copy(intersects[0].object.position);
+			// and align with the camera.
+			plane.lookAt(camera.position);
+
+		}
+	}
 };
 
-animate();
+document.onmousedown = function (event) {
+
+	// get the mouse positions
+	var mouse_x = (event.clientX / window.innerWidth) * 2 - 1;
+	var mouse_y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+	// use the projector to check for intersections. First thing to do is unproject
+	// the vector.
+	var vector = new THREE.Vector3(mouse_x, mouse_y, 0.5);
+	// we do this by using the unproject function which converts the 2D mouse
+	// position to a 3D vector.
+	vector.unproject(camera);
+
+	// now we cast a ray using this vector and see what is hit.
+	var raycaster = new THREE.Raycaster(camera.position,
+		vector.sub(camera.position).normalize());
+
+	// intersects contains an array of objects that might have been hit
+	var intersects = raycaster.intersectObjects(objects);
+
+	if (intersects.length > 0) {
+		orbit.enabled = false;
+
+		// the first one is the object we'll be moving around
+		selectedObject = intersects[0].object;
+
+		// and calculate the offset
+		var intersects = raycaster.intersectObject(plane);
+		offset.copy(intersects[0].point).sub(plane.position);
+	}
+};
+
+document.onmouseup = function (event) {
+	orbit.enabled = true;
+	selectedObject = null;
+}
+
+// calls the init function when the window is done loading.
+window.onload = init;
