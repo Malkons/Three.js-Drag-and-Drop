@@ -1,151 +1,393 @@
-// global variables
-var renderer;
-var scene;
-var camera;
-var cube;
+String.prototype.format = function () {
 
+	var str = this;
 
-var control;
-var orbit;
+	for (var i = 0; i < arguments.length; i++) {
 
-// used for drag and drop
-var plane;
-var selectedObject;
-var offset = new THREE.Vector3();
-var objects = [];
+		str = str.replace('{' + i + '}', arguments[i]);
 
-// based on http://mrdoob.github.io/three.js/examples/webgl_interactive_draggablecubes.html
+	}
+	return str;
+
+};
+
+var container, stats;
+var camera, scene, renderer;
+var splineHelperObjects = [];
+var splinePointsLength = 4;
+var positions = [];
+var point = new THREE.Vector3();
+
+var geometry = new THREE.BoxBufferGeometry(20, 20, 20);
+var transformControl;
+
+var ARC_SEGMENTS = 200;
+
+var splines = {};
+
+var params = {
+	uniform: true,
+	tension: 0.5,
+	centripetal: true,
+	chordal: true,
+	addPoint: addPoint,
+	removePoint: removePoint,
+	exportSpline: exportSpline
+};
+
+init();
+animate();
+
 function init() {
 
-	// create a scene, that will hold all our elements such as objects, cameras and lights.
+	container = document.createElement('div');
+	document.body.appendChild(container);
 	scene = new THREE.Scene();
+	scene.background = new THREE.Color(0xf0f0f0);
 
-	// create a camera, which defines where we're looking at.
-	camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+	camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 10000);
+	camera.position.set(0, 250, 1000);
+	scene.add(camera);
 
-	// create a render, sets the background color and the size
-	renderer = new THREE.WebGLRenderer();
-	renderer.setClearColor(0x00000, 1.0);
-	renderer.setSize(window.innerWidth, window.innerHeight);
+	scene.add(new THREE.AmbientLight(0xf0f0f0));
+	var light = new THREE.SpotLight(0xffffff, 1.5);
+	light.position.set(0, 1500, 200);
+	light.angle = Math.PI * 0.2;
+	light.castShadow = true;
+	light.shadow.camera.near = 200;
+	light.shadow.camera.far = 2000;
+	light.shadow.bias = - 0.000222;
+	light.shadow.mapSize.width = 1024;
+	light.shadow.mapSize.height = 1024;
+	scene.add(light);
 
-	plane = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000, 18, 18), new THREE.MeshBasicMaterial({
-		color: 0x00ff00,
-		opacity: 0.25,
-		transparent: true
-	}));
-	plane.visible = false;
+	var planeGeometry = new THREE.PlaneBufferGeometry(2000, 2000);
+	planeGeometry.rotateX(- Math.PI / 2);
+	var planeMaterial = new THREE.ShadowMaterial({ opacity: 0.2 });
+
+	var plane = new THREE.Mesh(planeGeometry, planeMaterial);
+	plane.position.y = - 200;
+	plane.receiveShadow = true;
 	scene.add(plane);
+	/*
+		var helper = new THREE.GridHelper( 2000, 100 );
+		helper.position.y = - 199;
+		helper.material.opacity = 0.25;
+		helper.material.transparent = true;
+		scene.add( helper );
+	*/
+	//var axes = new AxesHelper( 1000 );
+	//axes.position.set( - 500, - 500, - 500 );
+	//scene.add( axes );
 
-	for (var i = 0; i < 2; i++) {
-		// create a cube and add to scene
-		var cubeGeometry = new THREE.BoxGeometry(2, 2, 2);
-		var cubeMaterial = new THREE.MeshBasicMaterial({ wireframe: true });
-		cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-		objects.push(cube);
-		scene.add(cube);
+	renderer = new THREE.WebGLRenderer({ antialias: true });
+	renderer.setPixelRatio(window.devicePixelRatio);
+	renderer.setSize(window.innerWidth, window.innerHeight);
+	renderer.shadowMap.enabled = true;
+	container.appendChild(renderer.domElement);
+
+	stats = new Stats();
+	container.appendChild(stats.dom);
+
+	var gui = new dat.GUI();
+
+	gui.add(params, 'uniform');
+	gui.add(params, 'tension', 0, 1).step(0.01).onChange(function (value) {
+
+		splines.uniform.tension = value;
+		updateSplineOutline();
+
+	});
+	gui.add(params, 'centripetal');
+	gui.add(params, 'chordal');
+	gui.add(params, 'addPoint');
+	gui.add(params, 'removePoint');
+	gui.add(params, 'exportSpline');
+	gui.open();
+
+	// Controls
+	var controls = new THREE.OrbitControls(camera, renderer.domElement);
+	controls.damping = 0.2;
+	controls.addEventListener('change', render);
+
+	controls.addEventListener('start', function () {
+
+		cancelHideTransform();
+
+	});
+
+	controls.addEventListener('end', function () {
+
+		delayHideTransform();
+
+	});
+
+	transformControl = new THREE.TransformControls(camera, renderer.domElement);
+	transformControl.addEventListener('change', render);
+	transformControl.addEventListener('dragging-changed', function (event) {
+
+		controls.enabled = !event.value;
+
+	});
+	scene.add(transformControl);
+
+	// Hiding transform situation is a little in a mess :()
+	transformControl.addEventListener('change', function () {
+
+		cancelHideTransform();
+
+	});
+
+	transformControl.addEventListener('mouseDown', function () {
+
+		cancelHideTransform();
+
+	});
+
+	transformControl.addEventListener('mouseUp', function () {
+
+		delayHideTransform();
+
+	});
+
+	transformControl.addEventListener('objectChange', function () {
+
+		updateSplineOutline();
+
+	});
+
+	var dragcontrols = new THREE.DragControls(splineHelperObjects, camera, renderer.domElement); //
+	dragcontrols.enabled = false;
+	dragcontrols.addEventListener('hoveron', function (event) {
+
+		transformControl.attach(event.object);
+		cancelHideTransform();
+
+	});
+
+	dragcontrols.addEventListener('hoveroff', function () {
+
+		delayHideTransform();
+
+	});
+
+	var hiding;
+
+	function delayHideTransform() {
+
+		cancelHideTransform();
+		hideTransform();
+
 	}
 
-	// position and point the camera to the center of the scene
-	camera.position.x = 35;
-	camera.position.y = 35;
-	camera.position.z = 53;
-	camera.lookAt(scene.position);
+	function hideTransform() {
 
-	// add some controls so we can rotate
-	orbit = new THREE.OrbitControls(camera, renderer.domElement);
+		hiding = setTimeout(function () {
 
-	// add the output of the renderer to the html element
-	document.body.appendChild(renderer.domElement);
+			transformControl.detach(transformControl.object);
 
-	// call the render function
-	render();
+		}, 2500);
+
+	}
+
+	function cancelHideTransform() {
+
+		if (hiding) clearTimeout(hiding);
+
+	}
+
+	/*******
+	 * Curves
+	 *********/
+
+	for (var i = 0; i < splinePointsLength; i++) {
+
+		addSplineObject(positions[i]);
+
+	}
+
+	positions = [];
+
+	for (var i = 0; i < splinePointsLength; i++) {
+
+		positions.push(splineHelperObjects[i].position);
+
+	}
+
+	var geometry = new THREE.BufferGeometry();
+	geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ARC_SEGMENTS * 3), 3));
+
+	var curve = new THREE.CatmullRomCurve3(positions);
+	curve.curveType = 'catmullrom';
+	curve.mesh = new THREE.Line(geometry.clone(), new THREE.LineBasicMaterial({
+		color: 0xff0000,
+		opacity: 0.35
+	}));
+	curve.mesh.castShadow = true;
+	splines.uniform = curve;
+
+	curve = new THREE.CatmullRomCurve3(positions);
+	curve.curveType = 'centripetal';
+	curve.mesh = new THREE.Line(geometry.clone(), new THREE.LineBasicMaterial({
+		color: 0x00ff00,
+		opacity: 0.35
+	}));
+	curve.mesh.castShadow = true;
+	splines.centripetal = curve;
+
+	curve = new THREE.CatmullRomCurve3(positions);
+	curve.curveType = 'chordal';
+	curve.mesh = new THREE.Line(geometry.clone(), new THREE.LineBasicMaterial({
+		color: 0x0000ff,
+		opacity: 0.35
+	}));
+	curve.mesh.castShadow = true;
+	splines.chordal = curve;
+
+	for (var k in splines) {
+
+		var spline = splines[k];
+		scene.add(spline.mesh);
+
+	}
+
+	load([new THREE.Vector3(289.76843686945404, 452.51481137238443, 56.10018915737797),
+	new THREE.Vector3(- 53.56300074753207, 171.49711742836848, - 14.495472686253045),
+	new THREE.Vector3(- 91.40118730204415, 176.4306956436485, - 6.958271935582161),
+	new THREE.Vector3(- 383.785318791128, 491.1365363371675, 47.869296953772746),
+	]);
+	console.log(splineHelperObjects);
+	console.log(splines);
+	console.log(positions);
 }
 
-function addControls(controlObject) {
-	var gui = new dat.GUI();
-	gui.add(controlObject, 'rotationSpeed', -0.1, 0.1);
-	gui.add(controlObject, 'scale', 0.01, 2);
+function addSplineObject(position) {
+
+	var material = new THREE.MeshLambertMaterial({ color: Math.random() * 0xffffff });
+	var object = new THREE.Mesh(geometry, material);
+
+	if (position) {
+
+		object.position.copy(position);
+
+	} else {
+
+		object.position.x = Math.random() * 1000 - 500;
+		object.position.y = Math.random() * 600;
+		object.position.z = Math.random() * 800 - 400;
+
+	}
+
+	object.castShadow = true;
+	object.receiveShadow = true;
+	scene.add(object);
+	splineHelperObjects.push(object);
+	return object;
+
+}
+
+function addPoint() {
+
+	splinePointsLength++;
+
+	positions.push(addSplineObject().position);
+
+	updateSplineOutline();
+
+}
+
+function removePoint() {
+
+	if (splinePointsLength <= 4) {
+
+		return;
+
+	}
+	splinePointsLength--;
+	positions.pop();
+	scene.remove(splineHelperObjects.pop());
+
+	updateSplineOutline();
+
+}
+
+function updateSplineOutline() {
+
+	for (var k in splines) {
+
+		var spline = splines[k];
+
+		var splineMesh = spline.mesh;
+		var position = splineMesh.geometry.attributes.position;
+
+		for (var i = 0; i < ARC_SEGMENTS; i++) {
+
+			var t = i / (ARC_SEGMENTS - 1);
+			spline.getPoint(t, point);
+			position.setXYZ(i, point.x, point.y, point.z);
+
+		}
+
+		position.needsUpdate = true;
+
+	}
+
+}
+
+function exportSpline() {
+
+	var strplace = [];
+
+	for (var i = 0; i < splinePointsLength; i++) {
+
+		var p = splineHelperObjects[i].position;
+		strplace.push('new THREE.Vector3({0}, {1}, {2})'.format(p.x, p.y, p.z));
+
+	}
+
+	console.log(strplace.join(',\n'));
+	var code = '[' + (strplace.join(',\n\t')) + ']';
+	prompt('copy and paste code', code);
+
+}
+
+function load(new_positions) {
+
+	while (new_positions.length > positions.length) {
+
+		addPoint();
+
+	}
+
+	while (new_positions.length < positions.length) {
+
+		removePoint();
+
+	}
+
+	for (var i = 0; i < positions.length; i++) {
+
+		positions[i].copy(new_positions[i]);
+
+	}
+
+	updateSplineOutline();
+
+}
+
+function animate() {
+
+	requestAnimationFrame(animate);
+	render();
+	stats.update();
+
 }
 
 function render() {
+
+	splines.uniform.mesh.visible = params.uniform;
+	splines.centripetal.mesh.visible = params.centripetal;
+	splines.chordal.mesh.visible = params.chordal;
 	renderer.render(scene, camera);
-	orbit.update();
-	requestAnimationFrame(render);
+
 }
-
-document.onmousemove = function (event) {
-	// make sure we don't access anything else
-	event.preventDefault();
-
-	// get the mouse positions
-	var mouse_x = (event.clientX / window.innerWidth) * 2 - 1;
-	var mouse_y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-	// get the 3D position and create a raycaster
-	var vector = new THREE.Vector3(mouse_x, mouse_y, 0.5);
-	vector.unproject(camera);
-	var raycaster = new THREE.Raycaster(camera.position,
-		vector.sub(camera.position).normalize());
-
-	// first check if we've already selected an object by clicking
-	if (selectedObject) {
-		// check the position where the plane is intersected
-		var intersects = raycaster.intersectObject(plane);
-		// reposition the selectedobject based on the intersection with the plane
-		selectedObject.position.copy(intersects[0].point.sub(offset));
-	} else {
-		// if we haven't selected an object, we check if we might need
-		// to reposition our plane. We need to do this here, since
-		// we need to have this position before the onmousedown
-		// to calculate the offset.
-		var intersects = raycaster.intersectObjects(objects);
-
-		if (intersects.length > 0) {
-			// now reposition the plane to the selected objects position
-			plane.position.copy(intersects[0].object.position);
-			// and align with the camera.
-			plane.lookAt(camera.position);
-
-		}
-	}
-};
-
-document.onmousedown = function (event) {
-
-	// get the mouse positions
-	var mouse_x = (event.clientX / window.innerWidth) * 2 - 1;
-	var mouse_y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-	// use the projector to check for intersections. First thing to do is unproject
-	// the vector.
-	var vector = new THREE.Vector3(mouse_x, mouse_y, 0.5);
-	// we do this by using the unproject function which converts the 2D mouse
-	// position to a 3D vector.
-	vector.unproject(camera);
-
-	// now we cast a ray using this vector and see what is hit.
-	var raycaster = new THREE.Raycaster(camera.position,
-		vector.sub(camera.position).normalize());
-
-	// intersects contains an array of objects that might have been hit
-	var intersects = raycaster.intersectObjects(objects);
-
-	if (intersects.length > 0) {
-		orbit.enabled = false;
-
-		// the first one is the object we'll be moving around
-		selectedObject = intersects[0].object;
-
-		// and calculate the offset
-		var intersects = raycaster.intersectObject(plane);
-		offset.copy(intersects[0].point).sub(plane.position);
-	}
-};
-
-document.onmouseup = function (event) {
-	orbit.enabled = true;
-	selectedObject = null;
-}
-
-// calls the init function when the window is done loading.
-window.onload = init;
