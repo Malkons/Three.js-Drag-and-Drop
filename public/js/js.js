@@ -18,7 +18,7 @@ var splinePointsLength = 4;
 var positions = [];
 var point = new THREE.Vector3();
 
-var geometry = new THREE.BoxBufferGeometry(20, 20, 20);
+var geometry = new THREE.SphereBufferGeometry(20, 20, 20);
 var transformControl;
 
 var ARC_SEGMENTS = 200;
@@ -69,16 +69,6 @@ function init() {
 	plane.position.y = - 200;
 	plane.receiveShadow = true;
 	scene.add(plane);
-	/*
-		var helper = new THREE.GridHelper( 2000, 100 );
-		helper.position.y = - 199;
-		helper.material.opacity = 0.25;
-		helper.material.transparent = true;
-		scene.add( helper );
-	*/
-	//var axes = new AxesHelper( 1000 );
-	//axes.position.set( - 500, - 500, - 500 );
-	//scene.add( axes );
 
 	renderer = new THREE.WebGLRenderer({ antialias: true });
 	renderer.setPixelRatio(window.devicePixelRatio);
@@ -131,7 +121,7 @@ function init() {
 	});
 	scene.add(transformControl);
 
-	// Hiding transform situation is a little in a mess :()
+	// Hiding transform situation is a little in a mess :
 	transformControl.addEventListener('change', function () {
 
 		cancelHideTransform();
@@ -161,6 +151,7 @@ function init() {
 	dragcontrols.addEventListener('hoveron', function (event) {
 
 		transformControl.attach(event.object);
+
 		cancelHideTransform();
 
 	});
@@ -203,16 +194,20 @@ function init() {
 	for (var i = 0; i < splinePointsLength; i++) {
 
 		addSplineObject(positions[i]);
-
 	}
+
+	console.log(splineHelperObjects);
+	console.log(positions);
 
 	positions = [];
 
 	for (var i = 0; i < splinePointsLength; i++) {
 
 		positions.push(splineHelperObjects[i].position);
-
 	}
+
+	console.log(splineHelperObjects);
+	console.log(positions);
 
 	var geometry = new THREE.BufferGeometry();
 	geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ARC_SEGMENTS * 3), 3));
@@ -256,6 +251,7 @@ function init() {
 	new THREE.Vector3(- 91.40118730204415, 176.4306956436485, - 6.958271935582161),
 	new THREE.Vector3(- 383.785318791128, 491.1365363371675, 47.869296953772746),
 	]);
+
 	console.log(splineHelperObjects);
 	console.log(splines);
 	console.log(positions);
@@ -269,19 +265,20 @@ function addSplineObject(position) {
 	if (position) {
 
 		object.position.copy(position);
-
+		console.log(object);
 	} else {
 
 		object.position.x = Math.random() * 1000 - 500;
 		object.position.y = Math.random() * 600;
 		object.position.z = Math.random() * 800 - 400;
-
+		console.log(object);
 	}
 
 	object.castShadow = true;
 	object.receiveShadow = true;
 	scene.add(object);
 	splineHelperObjects.push(object);
+
 	return object;
 
 }
@@ -291,6 +288,7 @@ function addPoint() {
 	splinePointsLength++;
 
 	positions.push(addSplineObject().position);
+	console.log(positions);
 
 	updateSplineOutline();
 
@@ -352,7 +350,7 @@ function exportSpline() {
 }
 
 function load(new_positions) {
-
+	console.log(positions);
 	while (new_positions.length > positions.length) {
 
 		addPoint();
