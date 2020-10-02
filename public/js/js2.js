@@ -36,24 +36,6 @@ plane.position.y = - 200;
 plane.receiveShadow = true;
 scene.add(plane);
 
-var geometry = new THREE.BoxGeometry(2, 2, 2);
-var cubeMaterials = [
-    new THREE.MeshBasicMaterial({ map: new THREE.TextureLoader().load("../images/mountain.png"), side: THREE.DoubleSide }),
-    new THREE.MeshBasicMaterial({ map: new THREE.TextureLoader().load("../images/mountain.png"), side: THREE.DoubleSide }),
-    new THREE.MeshBasicMaterial({ map: new THREE.TextureLoader().load("../images/mountain.png"), side: THREE.DoubleSide }),
-    new THREE.MeshBasicMaterial({ map: new THREE.TextureLoader().load("../images/mountain.png"), side: THREE.DoubleSide }),
-    new THREE.MeshBasicMaterial({ map: new THREE.TextureLoader().load("../images/mountain.png"), side: THREE.DoubleSide }),
-    new THREE.MeshBasicMaterial({ map: new THREE.TextureLoader().load("../images/mountain.png"), side: THREE.DoubleSide }),
-];
-
-//logo cube
-var material = new THREE.MeshFaceMaterial(cubeMaterials);
-var cube = new THREE.Mesh(geometry, material);
-cube.position.y += 2;
-objectsToBeDragged.push(cube);
-console.log(objectsToBeDragged);
-scene.add(cube);
-
 // Controls
 var controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.damping = 0.2;
@@ -145,6 +127,26 @@ function cancelHideTransform() {
     if (hiding) clearTimeout(hiding);
 
 }
+
+var geometry = new THREE.BoxGeometry(2, 2, 2);
+var cubeMaterials = [
+    new THREE.MeshBasicMaterial({ map: new THREE.TextureLoader().load("../images/mountain.png"), side: THREE.DoubleSide }),
+    new THREE.MeshBasicMaterial({ map: new THREE.TextureLoader().load("../images/mountain.png"), side: THREE.DoubleSide }),
+    new THREE.MeshBasicMaterial({ map: new THREE.TextureLoader().load("../images/mountain.png"), side: THREE.DoubleSide }),
+    new THREE.MeshBasicMaterial({ map: new THREE.TextureLoader().load("../images/mountain.png"), side: THREE.DoubleSide }),
+    new THREE.MeshBasicMaterial({ map: new THREE.TextureLoader().load("../images/mountain.png"), side: THREE.DoubleSide }),
+    new THREE.MeshBasicMaterial({ map: new THREE.TextureLoader().load("../images/mountain.png"), side: THREE.DoubleSide }),
+];
+
+//logo cube
+var material = new THREE.MeshFaceMaterial(cubeMaterials);
+var cube = new THREE.Mesh(geometry, material);
+cube.position.y += 2;
+objectsToBeDragged.push(cube);
+console.log(objectsToBeDragged);
+scene.add(cube);
+
+
 
 
 //camera position

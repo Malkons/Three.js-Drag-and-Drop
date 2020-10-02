@@ -238,7 +238,7 @@ function init() {
 	}));
 	curve.mesh.castShadow = true;
 	splines.chordal = curve;
-
+	console.log(splines);
 	for (var k in splines) {
 
 		var spline = splines[k];
