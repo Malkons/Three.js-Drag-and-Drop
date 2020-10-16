@@ -26,6 +26,8 @@ var ARC_SEGMENTS = 200;
 var splines = {};
 
 var params = {
+    addPointCylinder: addPointCylinder,
+    addPointBox: addPointBox,
     addPoint: addPoint,
     removePoint: removePoint,
 };
@@ -75,8 +77,10 @@ function init() {
     container.appendChild(stats.dom);
 
     var gui = new dat.GUI();
-    gui.add(params, 'addPoint');
-    gui.add(params, 'removePoint');
+    gui.add(params, 'addPointCylinder').name('Add Cylinder');
+    gui.add(params, 'addPointBox').name('Add Cube');
+    gui.add(params, 'addPoint').name('Add Sphere');
+    gui.add(params, 'removePoint').name('Remove Point');
     gui.open();
 
     // Controls
@@ -223,8 +227,8 @@ function init() {
     console.log(positions);
 }
 
-function addSplineObject(position) {
-
+function addSplineObjectCylinder(position) {
+    var geometry = new THREE.CylinderBufferGeometry(20, 20, 20);
     var material = new THREE.MeshLambertMaterial({ color: Math.random() * 0xffffff });
     var object = new THREE.Mesh(geometry, material);
 
@@ -247,6 +251,81 @@ function addSplineObject(position) {
     splineHelperObjects.push(object);
 
     return object;
+
+}
+
+function addSplineObjectBox(position) {
+    var geometry = new THREE.BoxBufferGeometry(20, 20, 20);
+    var material = new THREE.MeshLambertMaterial({ color: Math.random() * 0xffffff });
+    var object = new THREE.Mesh(geometry, material);
+
+    if (position) {
+
+        object.position.copy(position);
+        console.log(object);
+        
+    } else {
+
+        object.position.x = Math.random() * 1000 - 500;
+        object.position.y = Math.random() * 600;
+        object.position.z = Math.random() * 800 - 400;
+        console.log(object);
+    }
+
+    object.castShadow = true;
+    object.receiveShadow = true;
+    scene.add(object);
+    splineHelperObjects.push(object);
+
+    return object;
+
+}
+
+function addSplineObject(position) {
+    var material = new THREE.MeshLambertMaterial({ color: Math.random() * 0xffffff });
+    var object = new THREE.Mesh(geometry, material);
+
+    if (position) {
+
+        object.position.copy(position);
+        console.log(object);
+        
+    } else {
+
+        object.position.x = Math.random() * 1000 - 500;
+        object.position.y = Math.random() * 600;
+        object.position.z = Math.random() * 800 - 400;
+        console.log(object);
+    }
+
+    object.castShadow = true;
+    object.receiveShadow = true;
+    scene.add(object);
+    splineHelperObjects.push(object);
+
+    return object;
+
+}
+
+function addPointCylinder() {
+
+    splinePointsLength++;
+
+    positions.push(addSplineObjectCylinder().position);
+    console.log(positions);
+
+    updateSplineOutline();
+
+}
+
+function addPointBox() {
+
+    splinePointsLength++;
+
+    positions.push(addSplineObjectBox().position);
+    console.log(positions);
+
+    updateSplineOutline();
 
 }
 
