@@ -17,6 +17,6 @@
   },
   "homepage": "https://github.com/Malkons/Three.js-Drag-and-Drop#readme",
   "dependencies": {
-    "express": "^4.17.1"
+    "express": "^4.18.2"
   }
 }
